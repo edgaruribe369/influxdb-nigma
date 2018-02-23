@@ -1,5 +1,5 @@
-import influxdb
-import constants as C
+from influxdb import InfluxDBClient
+import nigma.constants as C
 
 class Nigma(object):
     '''Canned Queries Base Class'''
@@ -27,10 +27,6 @@ class Nigma(object):
         return self.connect()
 
     def __exit__(self, exceptionType, exceptionValue, traceBack):
-        #if exceptionType is None:
-        #    pass
-        #else:
-        #    pass
         print('Attempting to Disconnect')
         self.disconnect()
 
@@ -39,11 +35,11 @@ class Nigma(object):
 
     def connect(self):
         '''Establish Connection'''
-        self.connection = influxdb.InfluxDBClient(self.host,
-                                                  self.port,
-                                                  self.user,
-                                                  self.pwd,
-                                                  self.db)
+        self.connection = InfluxDBClient(self.host,
+                                         self.port,
+                                         self.user,
+                                         self.pwd,
+                                         self.db)
         return self
 
     def disconnect(self):
@@ -67,36 +63,91 @@ class Session(object):
         self.measurement = None
 
     def useMeasurement(self, measurement):
+        '''
+        Set Query Measurement
+
+        :measurement: String name of influxdb measurement to use.
+        '''
         self.measurement = C.SELECT_MEASUREMENT.format(measurement)
 
     def query(self, fields):
-        self.fields.append(fields)
+        '''
+        Set Query Fields
+
+        :fields: List or String of InfluxDB fields to query.
+        '''
+        if type(fields) == list:
+            self.fields.extend(fields)
+        else:
+            self.fields.append(fields)
 
     def filter(self, field, comp, value):
+        '''
+        Set Query Filters
+
+        :field: String feld to compare
+        :comp: String comparison symbol (i.e. =, <, >)
+        :value: Int/Float value to compare above field
+        '''
         relationship = C.KEY_COMP.format(field, comp, value)
         self.filters.append(relationship)
 
-    def duration(self, value, comp='>'):
-        delta = C.RANGE_COMP.format(comp, value)
+    def duration(self, time):
+        '''
+        Set Query Duration
+
+        :time: String time for datapoints withing duration
+        (Example: 5m, 60m, 5hr)
+        '''
+        delta = C.RANGE_COMP.format(time)
         self.filters.append(delta)
 
     def fill(self, value):
+        '''
+        Set Query Fill for Aggregation Based Queries
+
+        :value: Int/Float/None Types
+        '''
         self.filler = str(value)
 
-    def group(self, field):
-        self.groupby.append(C.TAG_CAST.format(field))
+    def group(self, tags):
+        '''
+        Set Query GroupBy
+
+        :field: List or String of Tags to GroupBy
+        '''
+        if isinstance(tags, list):
+            for item in tags:
+                self.groupby.append(C.TAG_CAST.format(item))
+        else:
+            self.groupby.append(C.TAG_CAST.format(tags))
 
     def limit(self, value):
+        '''
+        Set Query Limit
+
+        :value: Int for number of datapoints to return
+        '''
         self.limited = value
 
     def view(self):
+        '''
+        View Query
+        '''
         return self._genQuery()
 
-    def execute(self):
-        res = self.nigma.connection.query(self._genQuery())
+    def execute(self, epoch = 'ms'):
+        '''
+        Execute Query
+        '''
+        res = self.nigma.connection.query(self._genQuery(),
+                                          epoch=epoch)
         return res
 
     def _genQuery(self):
+        '''
+        Generate String Query To Execute
+        '''
         query = ''
         if not self.fields:            
             query += C.SELECT_ALL

@@ -1,3 +1,6 @@
+'''
+Query Based Constants
+'''
 
 SELECT_ALL = 'SELECT * '
 SELECT_SPECIFIC = 'SELECT {}'
